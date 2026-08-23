@@ -18,7 +18,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .parse()
         .unwrap();
     let slave_id: u16 = env::var("FRONIUS_MODBUS_SLAVE_ID")
-        .unwrap_or_else(|_| "240".to_string())
+        .unwrap_or_else(|_| "126".to_string())
         .parse()
         .expect("Invalid SLAVE_ID");
     println!("Starting Fronius modbus bridge on: {socket_addr} - Slave-ID: {slave_id}");
