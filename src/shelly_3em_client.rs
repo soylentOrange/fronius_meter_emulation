@@ -5,6 +5,7 @@ use tokio_modbus::prelude::*;
 
 pub struct Shelly3EMClient {
     connection: Context,
+    slave: SlaveID,
 }
 // Registers are documented here
 // https://shelly-api-docs.shelly.cloud/gen2/ComponentsAndServices/EM/#modbus-registers
