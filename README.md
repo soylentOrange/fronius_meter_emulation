@@ -19,6 +19,8 @@ This can be useful when having other controlled loads that are also export power
 
 This software is best run as a docker container on a device that has a reliable network connection to all involved devices (i.e avoid WiFi if you can).
 
+The `docker-compose.yml` is matching my setup running on a Synology NAS with portainer. 
+
 ### The source meter
 
 At the moment the only source meter is the Shelly 3EM, more can be added if desired.
@@ -26,6 +28,7 @@ This meter is read via modbus, as this provides the simplest means of capturing 
 
 The Shelly modbus address and port must be specified via the `SHELLY_MODBUS` env var.
 The Shelly modbus slave id must be specified via the `SHELLY_MODBUS_SLAVE_ID` env var.
+For compatibilty with [bvweerd/shelly_em3pro_emulator](https://github.com/bvweerd/shelly_em3pro_emulator), set `SHELLY_MODBUS_SLAVE_ID=1`. 
 
 ### Home Assistant
 
@@ -43,6 +46,8 @@ The software has code to handle most of the readings published by the Fronius sm
 So the code doesnt bother with the rest and instead just implements those to keep latency down
 
 By default the modbus socket is bound on `0.0.0.0:1502`, but this can be overridden using the `FRONIUS_MODBUS_BIND` env var.
+The Slave-ID of the emulated meter needs to be in either range 1 to 14 or 84 to 127 (for my Fronius Symo Gen24). Set the Slave-ID using the `FRONIUS_MODBUS_SLAVE_ID` env var (defaults to 126). 
+
 
 ## Kudos
 
