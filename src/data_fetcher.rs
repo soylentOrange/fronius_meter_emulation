@@ -26,7 +26,10 @@ impl DataFetcher {
         let shelly_modbus =
             env::var("SHELLY_MODBUS").expect("Required to add Shelly modbus connection info");
 
-        println!("Connecting to shelly `{shelly_modbus}`");
+        let shelly_modbus_slave_id =
+            env::var("SHELLY_MODBUS_SLAVE_ID").expect("Required to add Shelly modbus connection info");
+
+        println!("Connecting to shelly `{shelly_modbus}` - `{shelly_modbus_slave_id}`");
         let mut shelly_client = Shelly3EMClient::new(shelly_modbus.parse().unwrap()).await;
         let mut home_assistant_client = HomeAssistantAPI::new();
 
