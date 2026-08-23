@@ -14,12 +14,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
 
     let socket_addr = env::var("FRONIUS_MODBUS_BIND")
-        .unwrap_or("0.0.0.0:1502".to_string())
+        .unwrap_or("0.0.0.0:502".to_string())
         .parse()
         .unwrap();
-    println!("Starting Fronius modbus bridge on {socket_addr}");
+    let slave_id = env::var("FRONIUS_MODBUS_SLAVE_ID")
+        .unwrap_or("240".to_string())
+        .parse()
+        .unwrap();
+    println!("Starting Fronius modbus bridge on: {socket_addr} - Slave-ID: {slave_id}");
 
-    let (emulated_meter, meter_update_handle) = SmartMeterEmulator::new();
+    let (emulated_meter, meter_update_handle) = SmartMeterEmulator::new(slave_id);
     let _data_fetcher = DataFetcher::new(meter_update_handle);
 
     //Start fake meter
