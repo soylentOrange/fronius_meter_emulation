@@ -76,7 +76,7 @@ impl tokio_modbus::server::Service for SmartMeterEmulator {
 }
 
 impl SmartMeterEmulator {
-    pub fn new(slave:u16) -> (Self, Sender<Readings>) {
+    pub fn new(slave: u16) -> (Self, Sender<Readings>) {
         let id = slave;
         // Insert some test data as register values.
         let mut input_registers = HashMap::new();
@@ -91,7 +91,7 @@ impl SmartMeterEmulator {
             70, 114, 111, 110, 105, 117, 115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 83, 109, 97, 114, 116, 32,
             77, 101, 116, 101, 114, 32, 54, 51, 65, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 48, 48, 48, 48, 48, 48, 48, 49, 0, 0, 0, 0, 0, 0, 0, 0,   //Block2
-            id, // Modbus address
+            id,  // Modbus address
             213, // Y connected 3 phase (ABCN)
             124, //End of static values
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
