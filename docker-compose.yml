@@ -1,10 +1,10 @@
 services:
   fronius-meter-emulation:
     restart: always
-    build:
-      context: .
+    network_mode: host
+    image: ghcr.io/ralim/fronius_meter_emulation:latest
     ports:
-      - 1502:502
+      - 502:1502
     environment:
       - HA_URL=http://192.168.0.2:8123
       - HA_TOKEN=your_long_lived_access_token
