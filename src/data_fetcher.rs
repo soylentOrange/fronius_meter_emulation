@@ -29,7 +29,7 @@ impl DataFetcher {
         let shelly_modbus_slave_id = env::var("SHELLY_MODBUS_SLAVE_ID")
             .expect("Required to add Shelly modbus connection info");
 
-        println!("Connecting to shelly `{shelly_modbus}` - `{shelly_modbus_slave_id}`");
+        println!("Connecting to shelly: `{shelly_modbus}` - Slave-ID: `{shelly_modbus_slave_id}`");
         let mut shelly_client = Shelly3EMClient::new(
             shelly_modbus.parse().unwrap(),
             shelly_modbus_slave_id.parse().unwrap(),
