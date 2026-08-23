@@ -5,14 +5,14 @@ use tokio_modbus::prelude::*;
 
 pub struct Shelly3EMClient {
     connection: Context,
-    slave: SlaveID,
+    slave: Slave,
 }
 // Registers are documented here
 // https://shelly-api-docs.shelly.cloud/gen2/ComponentsAndServices/EM/#modbus-registers
 
 impl Shelly3EMClient {
-    pub async fn new(target_device: SocketAddr) -> Self {
-        let connection = tcp::connect(target_device)
+    pub async fn new(target_device: SocketAddr, slave: Slave) -> Self {
+        let connection = tcp::connect_slave(target_device, slave)
             .await
             .expect("Cant Connect to Shelly 3EM");
 
