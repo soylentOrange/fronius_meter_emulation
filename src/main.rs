@@ -17,7 +17,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or("0.0.0.0:502".to_string())
         .parse()
         .unwrap();
-    let slave_id = env::var("FRONIUS_MODBUS_SLAVE_ID")
+    let slave_id: u16 = env::var("FRONIUS_MODBUS_SLAVE_ID")
         .unwrap_or("240".to_string())
         .parse()
         .unwrap();
