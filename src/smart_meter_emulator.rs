@@ -76,7 +76,8 @@ impl tokio_modbus::server::Service for SmartMeterEmulator {
 }
 
 impl SmartMeterEmulator {
-    pub fn new(slave: u16) -> (Self, Sender<Readings>) {
+    pub fn new() -> (Self, Sender<Readings>) {
+    //pub fn new(slave: u16) -> (Self, Sender<Readings>) {
         // let id = slave;
         // Insert some test data as register values.
         let mut input_registers = HashMap::new();
