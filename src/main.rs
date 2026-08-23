@@ -23,7 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap();
     println!("Starting Fronius modbus bridge on: {socket_addr} - Slave-ID: {slave_id}");
 
-    let (emulated_meter, meter_update_handle) = SmartMeterEmulator::new();
+    let (emulated_meter, meter_update_handle) = SmartMeterEmulator::new(slave_id);
     let _data_fetcher = DataFetcher::new(meter_update_handle);
 
     //Start fake meter
