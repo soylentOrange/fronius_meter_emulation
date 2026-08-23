@@ -6,12 +6,12 @@ services:
     environment:
       # - HA_URL=http://192.168.0.2:8123
       # - HA_TOKEN=your_long_lived_access_token
-      - SHELLY_MODBUS=192.168.0.3:502
-      - SHELLY_MODBUS_SLAVE_ID=1
-      - FRONIUS_MODBUS_BIND=0.0.0.0:1502
-      - FRONIUS_MODBUS_SLAVE_ID=126
       # - HA_EXTRA_IMPORT=sensor.fronius_solar_extra_import
       # - HA_EXTRA_EXPORT=sensor.fronius_solar_extra_export
+      - SHELLY_MODBUS=192.168.0.3:502
+      - SHELLY_MODBUS_SLAVE_ID=1    # matches: bvweerd/shelly_em3pro_emulator
+      - FRONIUS_MODBUS_BIND=0.0.0.0:1502  # 502 or 1502 for Fronius Symo Gen24 (502 is problematic though, probably need to run as root)
+      - FRONIUS_MODBUS_SLAVE_ID=126 # set to 1 to 14 or 84 to 127 for Fronius Symo Gen24
 
     healthcheck:
       test: netstat -an | grep 1502 > /dev/null; if [ 0 != $? ]; then exit 1; fi;
