@@ -14,7 +14,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
 
     let socket_addr = env::var("FRONIUS_MODBUS_BIND")
-        .unwrap_or("0.0.0.0:1502".to_string())
+        .unwrap_or("0.0.0.0:502".to_string())
         .parse()
         .unwrap();
     let slave_id: u16 = env::var("FRONIUS_MODBUS_SLAVE_ID")
