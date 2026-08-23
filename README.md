@@ -25,6 +25,7 @@ At the moment the only source meter is the Shelly 3EM, more can be added if desi
 This meter is read via modbus, as this provides the simplest means of capturing the measurements.
 
 The Shelly modbus address and port must be specified via the `SHELLY_MODBUS` env var.
+The Shelly modbus slave id must be specified via the `SHELLY_MODBUS_SLAVE_ID` env var.
 
 ### Home Assistant
 
