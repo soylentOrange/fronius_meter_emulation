@@ -16,7 +16,7 @@ impl Shelly3EMClient {
             .await
             .expect("Cant Connect to Shelly 3EM");
 
-        Self { connection }
+        Self { connection, slave }
     }
     pub async fn read_total_power(&mut self) -> Option<f32> {
         if let Ok(total_readings) = self.connection.read_input_registers(1013, 2).await.unwrap() {
