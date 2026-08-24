@@ -36,7 +36,6 @@ impl MqttFetcher {
                             if let Ok(val) = payload_str.trim().parse::<f32>() {
                                 let t = publish.topic.as_str();
 
-                                // Prüfen, ob das Topic zum konfigurierten Wechselrichter gehört
                                 let is_our_inverter = match &prefix_channel0 {
                                     Some(p) => t.contains(p),
                                     None => t.contains("/0/"),
@@ -50,8 +49,10 @@ impl MqttFetcher {
                                         let _ = tx.send(Readings::PhaseACurrent(val)).await;
                                         let _ = tx.send(Readings::NetACCurrent(val)).await;
                                     } else if t.ends_with("/power") {
-                                        let _ = tx.send(Readings::PhaseAWatts(val)).await;
-                                        let _ = tx.send(Readings::TotalRealPower(val)).await;
+                                        let signed_power = -val;
+                                        let _ = tx.send(Readings::PhaseAWatts(signed_power)).await;
+                                        let _ =
+                                            tx.send(Readings::TotalRealPower(signed_power)).await;
                                     } else if t.ends_with("/frequency") {
                                         let _ = tx.send(Readings::Frequency(val)).await;
                                     } else if t.ends_with("/powerfactor") {
@@ -66,8 +67,9 @@ impl MqttFetcher {
                                         let _ = tx.send(Readings::TotalExportEnergy(wh)).await;
                                     }
                                 } else if t.ends_with("ac/power") {
-                                    let _ = tx.send(Readings::PhaseAWatts(val)).await;
-                                    let _ = tx.send(Readings::TotalRealPower(val)).await;
+                                    let signed_power = -val;
+                                    let _ = tx.send(Readings::PhaseAWatts(signed_power)).await;
+                                    let _ = tx.send(Readings::TotalRealPower(signed_power)).await;
                                 } else if t.ends_with("ac/yieldtotal") {
                                     let wh = val * 1000.0;
                                     let _ = tx.send(Readings::TotalExportEnergy(wh)).await;
