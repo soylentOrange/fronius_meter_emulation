@@ -49,10 +49,10 @@ pub enum Readings {
 fn encode_sunspec_str(s: &str, register_count: usize) -> Vec<u16> {
     let mut registers = vec![0u16; register_count];
     let bytes = s.as_bytes();
-    for i in 0..register_count {
+    for (i, reg) in registers.iter_mut().enumerate() {
         let b1 = bytes.get(i * 2).copied().unwrap_or(0);
         let b2 = bytes.get(i * 2 + 1).copied().unwrap_or(0);
-        registers[i] = ((b1 as u16) << 8) | (b2 as u16);
+        *reg = ((b1 as u16) << 8) | (b2 as u16);
     }
     registers
 }
@@ -288,14 +288,13 @@ fn register_read(
     addr: u16,
     cnt: u16,
 ) -> Result<Vec<u16>, tokio_modbus::ExceptionCode> {
-    let mut response_values = vec![0; cnt.into()];
-    for i in 0..cnt {
-        let reg_addr = addr + i;
-        if let Some(r) = registers.get(&reg_addr) {
-            response_values[i as usize] = *r;
-        } else {
-            return Err(tokio_modbus::ExceptionCode::IllegalDataAddress);
-        }
-    }
-    Ok(response_values)
+    (0..cnt)
+        .map(|i| {
+            let reg_addr = addr + i;
+            registers
+                .get(&reg_addr)
+                .copied()
+                .ok_or(tokio_modbus::ExceptionCode::IllegalDataAddress)
+        })
+        .collect()
 }
