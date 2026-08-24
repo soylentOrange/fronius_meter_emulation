@@ -49,10 +49,8 @@ impl MqttFetcher {
                                         let _ = tx.send(Readings::PhaseACurrent(val)).await;
                                         let _ = tx.send(Readings::NetACCurrent(val)).await;
                                     } else if t.ends_with("/power") {
-                                        let signed_power = -val;
-                                        let _ = tx.send(Readings::PhaseAWatts(signed_power)).await;
-                                        let _ =
-                                            tx.send(Readings::TotalRealPower(signed_power)).await;
+                                        let _ = tx.send(Readings::PhaseAWatts(val)).await;
+                                        let _ = tx.send(Readings::TotalRealPower(val)).await;
                                     } else if t.ends_with("/frequency") {
                                         let _ = tx.send(Readings::Frequency(val)).await;
                                     } else if t.ends_with("/powerfactor") {
@@ -67,9 +65,8 @@ impl MqttFetcher {
                                         let _ = tx.send(Readings::TotalExportEnergy(wh)).await;
                                     }
                                 } else if t.ends_with("ac/power") {
-                                    let signed_power = -val;
-                                    let _ = tx.send(Readings::PhaseAWatts(signed_power)).await;
-                                    let _ = tx.send(Readings::TotalRealPower(signed_power)).await;
+                                    let _ = tx.send(Readings::PhaseAWatts(val)).await;
+                                    let _ = tx.send(Readings::TotalRealPower(val)).await;
                                 } else if t.ends_with("ac/yieldtotal") {
                                     let wh = val * 1000.0;
                                     let _ = tx.send(Readings::TotalExportEnergy(wh)).await;

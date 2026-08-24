@@ -1,54 +1,110 @@
-# Fronius Smart Meter IP Emulation
+# Fronius SunSpec Smart Meter Emulation (MQTT / OpenDTU)
 
-TL;DR I'm not installing multiple vendors smart meters because of vendor locking.
+This service bridges MQTT power metrics (specifically tailored for **OpenDTU / Hoymiles microinverters** or generic MQTT power meters) to a **SunSpec-compliant Modbus TCP Smart Meter**. 
 
-This software is setup to read from a Shelly 3EM over TCP Modbus, and then provide those readings to a Fronius solar inverter.
-This setup will **NEVER** be perfect. You will **not** be able to ever use this for 0 export control.
-This is used as "near enough" control for situations where you _can_ export to the grid, but pricing may be non optimal.
-Such as in Australia when on wholesale pricing and during the middle of the day when export prices go negative.
-All this code does is transfer the power readings over between the Shelly Modbus and the Fronius Modbus TCP interface.
+It enables Fronius inverters (such as the Symo, Primo, and Gen24 series) to read external AC generation data as an **auxiliary generator meter (*Erzeugerzähler*)** or sub-meter and integrate it seamlessly into the Fronius Energy Flow and Solar.web.
 
-To enhance this slightly further, biasing values can be read from home assistant (or another http server).
-These will be merged in with the "real" readings, to allow software to drive the inverter to regulate around a different setpoint.
-This is useful as normally you would set the inverter to some limit X of the maximum grid export amount, and it will internally use a control loop
-to try and regulate its output to keep at that setpoint of export.
-By using these inputs you can then shift this regulation point to where is desired.
-This can be useful when having other controlled loads that are also export power aware.
+---
 
-## Usage
+## Features
 
-This software is best run as a docker container on a device that has a reliable network connection to all involved devices (i.e avoid WiFi if you can).
+* **SunSpec Compliant:** Implements **Model 1** (Common Device Identification with custom Serial Number) and **Model 213** (3-Phase AC Float Meter layout starting at register `40000`).
+* **Native OpenDTU / Hoymiles Ingestion:** Automatically consumes OpenDTU MQTT topics (`voltage`, `current`, `power`, `frequency`, `powerfactor`, `reactivepower`, `yieldtotal`) for Channel 0 (AC).
+* **Automatic Unit & Sign Conversions:**
+  * Inverts active power signs to match the Fronius Modbus convention for generator meters (negative register value = positive PV generation in Solar.web).
+  * Automatically handles unit scaling (e.g., converts kWh to Wh and normalizes power factor percentages).
+* **Watchdog Protection:** Terminates cleanly if no MQTT updates arrive within 30 seconds to prevent serving stale data to the inverter.
+* **Lightweight & Async:** Built with Rust, `tokio`, `tokio-modbus`, and `rumqttc`.
 
-The `docker-compose.yml` is matching my setup running on a Synology NAS with portainer. 
+---
 
-### The source meter
+## Architecture & Data Flow
 
-At the moment the only source meter is the Shelly 3EM, more can be added if desired.
-This meter is read via modbus, as this provides the simplest means of capturing the measurements.
+```text
+[OpenDTU / Inverter]
+        │
+        │ (MQTT publish: power, voltage, current, yield)
+        ▼
+  [MQTT Broker]
+        │
+        │ (rumqttc client)
+        ▼
+[Fronius Meter Emulation]
+  ├── MQTT Fetcher Task ──(mpsc channel)──► Register Handler
+  └── Modbus TCP Server (Port 1502 / 502) ◄── Holding Registers (SunSpec M1 + M213)
+        ▲
+        │ (Modbus TCP polling every 1-2s)
+[Fronius Symo / Gen24 Inverter]
+```
 
-The Shelly modbus address and port must be specified via the `SHELLY_MODBUS` env var.
-The Shelly modbus slave id must be specified via the `SHELLY_MODBUS_SLAVE_ID` env var.
-For compatibilty with [bvweerd/shelly_em3pro_emulator](https://github.com/bvweerd/shelly_em3pro_emulator), set `SHELLY_MODBUS_SLAVE_ID=1`. 
+---
 
-### Home Assistant
+## Configuration
 
-The Home Assistant controls are read over the API from home assitant at approximately 1Hz.
-To aid in control, there are two controls supported; which are added as virtual export and virtual import.
-This means if you have a virtual export of 1000W and a virtual import of 400W, a net shift of 600W of export is added to the raw meter
-reading before its reported to the virtual meter.
+All configuration is provided through environment variables.
 
-The Home Assistant integration can be configured via the `HA_URL`, `HA_TOKEN`, `HA_EXTRA_IMPORT` and `HA_EXTRA_EXPORT` env vars.
+| Variable | Default | Description |
+| :--- | :--- | :--- |
+| `FRONIUS_MODBUS_BIND` | `0.0.0.0:1502` | Socket address for the Modbus TCP server. |
+| `FRONIUS_MODBUS_SLAVE_ID` | `240` | Modbus Unit ID / Slave ID (must match inverter config). |
+| `INVERTER_SERIAL` | `00000001` | Serial number of the Hoymiles/OpenDTU inverter (used for topic filtering and SunSpec Model 1 SN). |
+| `MQTT_BROKER_HOST` | `127.0.0.1` | IP address or hostname of the MQTT broker. |
+| `MQTT_BROKER_PORT` | `1883` | Port of the MQTT broker. |
+| `MQTT_TOPIC` | `opendtu/#` | Base MQTT topic to subscribe to (use `#` wildcard). |
+| `MQTT_USER` | *(None)* | Optional username for MQTT authentication. |
+| `MQTT_PASSWORD` | *(None)* | Optional password for MQTT authentication. |
 
-### The Emulated meter
+---
 
-The emulated meter does not implement writing.
-The software has code to handle most of the readings published by the Fronius smart meter; but in testing its been found the inverter only looks at the net wattage values anyway.
-So the code doesnt bother with the rest and instead just implements those to keep latency down
+## Docker Compose Example
 
-By default the modbus socket is bound on `0.0.0.0:1502`, but this can be overridden using the `FRONIUS_MODBUS_BIND` env var.
-The Slave-ID of the emulated meter needs to be in either range 1 to 14 or 84 to 127 (for my Fronius Symo Gen24). Set the Slave-ID using the `FRONIUS_MODBUS_SLAVE_ID` env var (defaults to 126). 
+```yaml
+services:
+  fronius-meter-emulation:
+    restart: always
+    network_mode: host
+    image: ghcr.io/soylentorange/fronius_meter_emulation:latest
+    environment:
+      # Modbus settings
+      # Set port to 502 or 1502 for Fronius Symo Gen24
+      # (502 is problematic though, probably need to run as root)
+      - FRONIUS_MODBUS_BIND=0.0.0.0:1502
+      # set slave-id to 1 to 14 or 84 to 127 for Fronius Symo Gen24
+      - FRONIUS_MODBUS_SLAVE_ID=126
+      - INVERTER_SERIAL=119182145457
 
+      # MQTT Broker settings
+      - MQTT_BROKER_HOST=192.168.178.244
+      - MQTT_BROKER_PORT=1883
+      - MQTT_TOPIC=opendtu/#
+      - MQTT_USER=your_user_name_for_emulator
+      - MQTT_PASSWORD=your_secure_password
+    healthcheck:
+      test: ["CMD-SHELL", "netstat -an | grep 1502 > /dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+```
 
-## Kudos
+---
 
-https://www.photovoltaikforum.com/thread/224214-gen24-smart-meter-modbus-tcp-emulation-mit-esp32/
+## Fronius Inverter Setup
+
+1. Open the Fronius web interface and log in with **Technician / Service** credentials.
+2. Navigate to **Device Configuration** → **Components** → **Meters**.
+3. Click **Add Meter** and configure:
+   * **Meter Type:** Modbus TCP (SunSpec)
+   * **IP Address:** IP of your Docker host
+   * **Port:** `1502`
+   * **Modbus Address (Slave ID):** `126` (matches `FRONIUS_MODBUS_SLAVE_ID`)
+   * **Category / Location:** **Producer / Generator Meter** (*Erzeugerzähler* / *Weiterer Erzeuger*)
+4. Save the configuration. The inverter will detect the SunSpec Model 1 & 213 layout and include the external microinverter generation in total production figures.
+
+---
+
+## Kudos & References
+
+* [Photovoltaikforum: Gen24 Smart Meter Modbus TCP Emulation mit ESP32](https://www.photovoltaikforum.com/thread/224214-gen24-smart-meter-modbus-tcp-emulation-mit-esp32/)
+* [OpenDTU Project](https://github.com/tbnobody/OpenDTU)
+* [Ralim/fronius_meter_emulation for the initial idea](https://github.com/Ralim/fronius_meter_emulation)
