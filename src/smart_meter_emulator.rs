@@ -58,59 +58,70 @@ fn encode_sunspec_str(s: &str, register_count: usize) -> Vec<u16> {
 }
 
 impl SmartMeterEmulator {
-    pub fn new(slave_id: u16) -> (Self, Sender<Readings>) {
+    pub fn new(slave_id: u16, serial_number: &str) -> (Self, Sender<Readings>) {
         let mut holding_registers = HashMap::new();
 
-        // 1. SunSpec Marker at 40000
+        // 1. SunSpec Base Marker at 40000 / 40001
         holding_registers.insert(40000, 0x5375); // 'Su'
         holding_registers.insert(40001, 0x6e53); // 'nS'
 
-        // 2. Model 1 (Identification Header)
-        holding_registers.insert(40002, 1);
-        holding_registers.insert(40003, 65);
+        // 2. Model 1 (Common Identification Model)
+        holding_registers.insert(40002, 1); // Model ID = 1
+        holding_registers.insert(40003, 65); // Model Length = 65 registers
 
         let mut offset = 40004;
+
+        // Manufacturer (16 registers)
         for reg in encode_sunspec_str("Fronius", 16) {
             holding_registers.insert(offset, reg);
             offset += 1;
         }
+        // Model (16 registers)
         for reg in encode_sunspec_str("Smart Meter 63A", 16) {
             holding_registers.insert(offset, reg);
             offset += 1;
         }
+        // Options (8 registers)
         for reg in encode_sunspec_str("", 8) {
             holding_registers.insert(offset, reg);
             offset += 1;
         }
+        // Version (8 registers)
         for reg in encode_sunspec_str("1.0", 8) {
             holding_registers.insert(offset, reg);
             offset += 1;
         }
-        for reg in encode_sunspec_str("00000001", 16) {
+        // Serial Number (16 registers)
+        let clean_sn = if serial_number.trim().is_empty() {
+            "00000001"
+        } else {
+            serial_number
+        };
+        for reg in encode_sunspec_str(clean_sn, 16) {
             holding_registers.insert(offset, reg);
             offset += 1;
         }
-        // Modbus Address register (40068)
+        // Modbus Device Address (1 register -> Address 40068)
         holding_registers.insert(offset, slave_id);
         offset += 1;
 
         // 3. Model 213 (Float AC Meter)
-        holding_registers.insert(offset, 213); // 40069
+        holding_registers.insert(offset, 213); // Model ID = 213 (Address 40069)
         offset += 1;
-        holding_registers.insert(offset, 124); // 40070
+        holding_registers.insert(offset, 124); // Model Length = 124 (Address 40070)
         offset += 1;
 
-        // Initialize 124 data registers to 0.0
+        // Initialize all 124 registers of Model 213 (40071 to 40194) to 0
         for addr in offset..(offset + 124) {
             holding_registers.insert(addr, 0);
         }
         offset += 124;
 
-        // 4. End-of-List Terminator
+        // 4. SunSpec End-of-List Terminator (Address 40195 - 40196)
         holding_registers.insert(offset, 0xFFFF);
         holding_registers.insert(offset + 1, 0x0000);
 
-        // Discovery fallbacks
+        // Discovery probe fallbacks
         holding_registers.insert(0, 1);
         holding_registers.insert(1, 0);
 

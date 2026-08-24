@@ -9,6 +9,7 @@ services:
       - FRONIUS_MODBUS_BIND=0.0.0.0:1502
       # set slave-id to 1 to 14 or 84 to 127 for Fronius Symo Gen24
       - FRONIUS_MODBUS_SLAVE_ID=126
+      - INVERTER_SERIAL=123456789
 
       # MQTT Broker Settings
       - MQTT_BROKER_HOST=192.168.178.244

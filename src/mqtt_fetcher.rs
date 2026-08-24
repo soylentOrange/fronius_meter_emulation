@@ -10,6 +10,7 @@ impl MqttFetcher {
         broker_host: &str,
         broker_port: u16,
         topic: &str,
+        serial: Option<String>,
         username: Option<String>,
         password: Option<String>,
         tx: Sender<Readings>,
@@ -25,36 +26,49 @@ impl MqttFetcher {
         client.subscribe(topic, QoS::AtMostOnce).await?;
         println!("Subscribed to MQTT topic: {topic}");
 
+        let prefix_channel0 = serial.as_ref().map(|s| format!("{s}/0/"));
+
         tokio::spawn(async move {
             loop {
                 match eventloop.poll().await {
                     Ok(Event::Incoming(Packet::Publish(publish))) => {
                         if let Ok(payload_str) = std::str::from_utf8(&publish.payload) {
                             if let Ok(val) = payload_str.trim().parse::<f32>() {
-                                let topic = publish.topic.as_str();
+                                let t = publish.topic.as_str();
 
-                                if topic.ends_with("/voltage") {
-                                    let _ = tx.send(Readings::PhaseAVoltage(val)).await;
-                                    let _ = tx.send(Readings::AveragePhaseVoltage(val)).await;
-                                } else if topic.ends_with("/current") {
-                                    let _ = tx.send(Readings::PhaseACurrent(val)).await;
-                                    let _ = tx.send(Readings::NetACCurrent(val)).await;
-                                } else if topic.ends_with("/0/power") || topic == "ac/power" {
+                                // Prüfen, ob das Topic zum konfigurierten Wechselrichter gehört
+                                let is_our_inverter = match &prefix_channel0 {
+                                    Some(p) => t.contains(p),
+                                    None => t.contains("/0/"),
+                                };
+
+                                if is_our_inverter {
+                                    if t.ends_with("/voltage") {
+                                        let _ = tx.send(Readings::PhaseAVoltage(val)).await;
+                                        let _ = tx.send(Readings::AveragePhaseVoltage(val)).await;
+                                    } else if t.ends_with("/current") {
+                                        let _ = tx.send(Readings::PhaseACurrent(val)).await;
+                                        let _ = tx.send(Readings::NetACCurrent(val)).await;
+                                    } else if t.ends_with("/power") {
+                                        let _ = tx.send(Readings::PhaseAWatts(val)).await;
+                                        let _ = tx.send(Readings::TotalRealPower(val)).await;
+                                    } else if t.ends_with("/frequency") {
+                                        let _ = tx.send(Readings::Frequency(val)).await;
+                                    } else if t.ends_with("/powerfactor") {
+                                        let pf = val / 100.0;
+                                        let _ = tx.send(Readings::PhaseAPF(pf)).await;
+                                        let _ = tx.send(Readings::PowerFactorTotal(pf)).await;
+                                    } else if t.ends_with("/reactivepower") {
+                                        let _ = tx.send(Readings::PhaseAVAR(val)).await;
+                                        let _ = tx.send(Readings::ReactivePower(val)).await;
+                                    } else if t.ends_with("/yieldtotal") {
+                                        let wh = val * 1000.0;
+                                        let _ = tx.send(Readings::TotalExportEnergy(wh)).await;
+                                    }
+                                } else if t.ends_with("ac/power") {
                                     let _ = tx.send(Readings::PhaseAWatts(val)).await;
                                     let _ = tx.send(Readings::TotalRealPower(val)).await;
-                                } else if topic.ends_with("/frequency") {
-                                    let _ = tx.send(Readings::Frequency(val)).await;
-                                } else if topic.ends_with("/powerfactor") {
-                                    // Umrechnung von % in Faktor (z.B. 98.0% -> 0.98)
-                                    let pf = val / 100.0;
-                                    let _ = tx.send(Readings::PhaseAPF(pf)).await;
-                                    let _ = tx.send(Readings::PowerFactorTotal(pf)).await;
-                                } else if topic.ends_with("/reactivepower") {
-                                    let _ = tx.send(Readings::PhaseAVAR(val)).await;
-                                    let _ = tx.send(Readings::ReactivePower(val)).await;
-                                } else if topic.ends_with("/yieldtotal") || topic == "ac/yieldtotal"
-                                {
-                                    // Umrechnung von kWh in Wh für SunSpec
+                                } else if t.ends_with("ac/yieldtotal") {
                                     let wh = val * 1000.0;
                                     let _ = tx.send(Readings::TotalExportEnergy(wh)).await;
                                 }
