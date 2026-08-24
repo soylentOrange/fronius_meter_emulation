@@ -12,7 +12,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 1. Modbus Server configuration
     let bind_str = env::var("FRONIUS_MODBUS_BIND").unwrap_or_else(|_| "0.0.0.0:1502".to_string());
-    let socket_addr: SocketAddr = bind_str.parse().expect("Invalid FRONIUS_MODBUS_BIND address");
+    let socket_addr: SocketAddr = bind_str
+        .parse()
+        .expect("Invalid FRONIUS_MODBUS_BIND address");
 
     let slave_id: u16 = env::var("FRONIUS_MODBUS_SLAVE_ID")
         .ok()

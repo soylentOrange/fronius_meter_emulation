@@ -134,37 +134,99 @@ impl SmartMeterEmulator {
 
         while let Ok(Some(reading)) = timeout(data_update_timeout, events.recv()).await {
             match reading {
-                Readings::NetACCurrent(v) => Self::set_holding_reg_f32(&holding_registers, 40071, v).await,
-                Readings::PhaseACurrent(v) => Self::set_holding_reg_f32(&holding_registers, 40073, v).await,
-                Readings::PhaseBCurrent(v) => Self::set_holding_reg_f32(&holding_registers, 40075, v).await,
-                Readings::PhaseCCurrent(v) => Self::set_holding_reg_f32(&holding_registers, 40077, v).await,
-                Readings::AveragePhaseVoltage(v) => Self::set_holding_reg_f32(&holding_registers, 40079, v).await,
-                Readings::PhaseAVoltage(v) => Self::set_holding_reg_f32(&holding_registers, 40081, v).await,
-                Readings::PhaseBVoltage(v) => Self::set_holding_reg_f32(&holding_registers, 40083, v).await,
-                Readings::PhaseCVoltage(v) => Self::set_holding_reg_f32(&holding_registers, 40085, v).await,
-                Readings::AverageLLVoltage(v) => Self::set_holding_reg_f32(&holding_registers, 40087, v).await,
-                Readings::PhaseABVoltage(v) => Self::set_holding_reg_f32(&holding_registers, 40089, v).await,
-                Readings::PhaseBCVoltage(v) => Self::set_holding_reg_f32(&holding_registers, 40091, v).await,
-                Readings::PhaseCAVoltage(v) => Self::set_holding_reg_f32(&holding_registers, 40093, v).await,
-                Readings::Frequency(v) => Self::set_holding_reg_f32(&holding_registers, 40095, v).await,
-                Readings::TotalRealPower(v) => Self::set_holding_reg_f32(&holding_registers, 40097, v).await,
-                Readings::PhaseAWatts(v) => Self::set_holding_reg_f32(&holding_registers, 40099, v).await,
-                Readings::PhaseBWatts(v) => Self::set_holding_reg_f32(&holding_registers, 40101, v).await,
-                Readings::PhaseCWatts(v) => Self::set_holding_reg_f32(&holding_registers, 40103, v).await,
-                Readings::ApparentPower(v) => Self::set_holding_reg_f32(&holding_registers, 40105, v).await,
-                Readings::PhaseAVA(v) => Self::set_holding_reg_f32(&holding_registers, 40107, v).await,
-                Readings::PhaseBVA(v) => Self::set_holding_reg_f32(&holding_registers, 40109, v).await,
-                Readings::PhaseCVA(v) => Self::set_holding_reg_f32(&holding_registers, 40111, v).await,
-                Readings::ReactivePower(v) => Self::set_holding_reg_f32(&holding_registers, 40113, v).await,
-                Readings::PhaseAVAR(v) => Self::set_holding_reg_f32(&holding_registers, 40115, v).await,
-                Readings::PhaseBVAR(v) => Self::set_holding_reg_f32(&holding_registers, 40117, v).await,
-                Readings::PhaseCVAR(v) => Self::set_holding_reg_f32(&holding_registers, 40119, v).await,
-                Readings::PowerFactorTotal(v) => Self::set_holding_reg_f32(&holding_registers, 40121, v).await,
-                Readings::PhaseAPF(v) => Self::set_holding_reg_f32(&holding_registers, 40123, v).await,
-                Readings::PhaseBPF(v) => Self::set_holding_reg_f32(&holding_registers, 40125, v).await,
-                Readings::PhaseCPF(v) => Self::set_holding_reg_f32(&holding_registers, 40127, v).await,
-                Readings::TotalExportEnergy(v) => Self::set_holding_reg_f32(&holding_registers, 40129, v).await,
-                Readings::TotalImportEnergy(v) => Self::set_holding_reg_f32(&holding_registers, 40137, v).await,
+                Readings::NetACCurrent(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40071, v).await
+                }
+                Readings::PhaseACurrent(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40073, v).await
+                }
+                Readings::PhaseBCurrent(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40075, v).await
+                }
+                Readings::PhaseCCurrent(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40077, v).await
+                }
+                Readings::AveragePhaseVoltage(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40079, v).await
+                }
+                Readings::PhaseAVoltage(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40081, v).await
+                }
+                Readings::PhaseBVoltage(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40083, v).await
+                }
+                Readings::PhaseCVoltage(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40085, v).await
+                }
+                Readings::AverageLLVoltage(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40087, v).await
+                }
+                Readings::PhaseABVoltage(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40089, v).await
+                }
+                Readings::PhaseBCVoltage(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40091, v).await
+                }
+                Readings::PhaseCAVoltage(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40093, v).await
+                }
+                Readings::Frequency(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40095, v).await
+                }
+                Readings::TotalRealPower(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40097, v).await
+                }
+                Readings::PhaseAWatts(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40099, v).await
+                }
+                Readings::PhaseBWatts(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40101, v).await
+                }
+                Readings::PhaseCWatts(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40103, v).await
+                }
+                Readings::ApparentPower(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40105, v).await
+                }
+                Readings::PhaseAVA(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40107, v).await
+                }
+                Readings::PhaseBVA(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40109, v).await
+                }
+                Readings::PhaseCVA(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40111, v).await
+                }
+                Readings::ReactivePower(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40113, v).await
+                }
+                Readings::PhaseAVAR(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40115, v).await
+                }
+                Readings::PhaseBVAR(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40117, v).await
+                }
+                Readings::PhaseCVAR(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40119, v).await
+                }
+                Readings::PowerFactorTotal(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40121, v).await
+                }
+                Readings::PhaseAPF(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40123, v).await
+                }
+                Readings::PhaseBPF(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40125, v).await
+                }
+                Readings::PhaseCPF(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40127, v).await
+                }
+                Readings::TotalExportEnergy(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40129, v).await
+                }
+                Readings::TotalImportEnergy(v) => {
+                    Self::set_holding_reg_f32(&holding_registers, 40137, v).await
+                }
             }
         }
         eprintln!("No readings updates received in 30s, exiting");
@@ -186,12 +248,7 @@ impl SmartMeterEmulator {
         value: f32,
     ) {
         let bits: u32 = value.to_bits();
-        Self::set_holding_reg(
-            holding_registers,
-            register_base_number,
-            (bits >> 16) as u16,
-        )
-        .await;
+        Self::set_holding_reg(holding_registers, register_base_number, (bits >> 16) as u16).await;
         Self::set_holding_reg(
             holding_registers,
             register_base_number + 1,

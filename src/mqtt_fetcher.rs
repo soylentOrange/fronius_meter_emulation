@@ -36,21 +36,30 @@ impl MqttFetcher {
                                 if subtopic.ends_with("/voltage") || subtopic.ends_with("/u") {
                                     let _ = tx.send(Readings::PhaseAVoltage(val)).await;
                                     let _ = tx.send(Readings::AveragePhaseVoltage(val)).await;
-                                } else if subtopic.ends_with("/current") || subtopic.ends_with("/i") {
+                                } else if subtopic.ends_with("/current") || subtopic.ends_with("/i")
+                                {
                                     let _ = tx.send(Readings::PhaseACurrent(val)).await;
                                     let _ = tx.send(Readings::NetACCurrent(val)).await;
                                 } else if subtopic.ends_with("/power") || subtopic.ends_with("/p") {
                                     let _ = tx.send(Readings::PhaseAWatts(val)).await;
                                     let _ = tx.send(Readings::TotalRealPower(val)).await;
-                                } else if subtopic.ends_with("/frequency") || subtopic.ends_with("/f") {
+                                } else if subtopic.ends_with("/frequency")
+                                    || subtopic.ends_with("/f")
+                                {
                                     let _ = tx.send(Readings::Frequency(val)).await;
-                                } else if subtopic.ends_with("/power_factor") || subtopic.ends_with("/pf") {
+                                } else if subtopic.ends_with("/power_factor")
+                                    || subtopic.ends_with("/pf")
+                                {
                                     let _ = tx.send(Readings::PhaseAPF(val)).await;
                                     let _ = tx.send(Readings::PowerFactorTotal(val)).await;
-                                } else if subtopic.ends_with("/reactive_power") || subtopic.ends_with("/q") {
+                                } else if subtopic.ends_with("/reactive_power")
+                                    || subtopic.ends_with("/q")
+                                {
                                     let _ = tx.send(Readings::PhaseAVAR(val)).await;
                                     let _ = tx.send(Readings::ReactivePower(val)).await;
-                                } else if subtopic.ends_with("/total_exported") || subtopic.ends_with("/export") {
+                                } else if subtopic.ends_with("/total_exported")
+                                    || subtopic.ends_with("/export")
+                                {
                                     let _ = tx.send(Readings::TotalExportEnergy(val)).await;
                                 }
                             }
