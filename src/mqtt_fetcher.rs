@@ -56,7 +56,7 @@ impl MqttFetcher {
                                     } else if t.ends_with("/frequency") {
                                         let _ = tx.send(Readings::Frequency(val)).await;
                                     } else if t.ends_with("/powerfactor") {
-                                        let pf = val / 100.0;
+                                        let pf = if val.abs() > 1.0 { val / 100.0 } else { val };
                                         let _ = tx.send(Readings::PhaseAPF(pf)).await;
                                         let _ = tx.send(Readings::PowerFactorTotal(pf)).await;
                                     } else if t.ends_with("/reactivepower") {
