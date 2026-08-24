@@ -1,35 +1,56 @@
-use data_fetcher::DataFetcher;
 use smart_meter_emulator::SmartMeterEmulator;
 use std::{env, net::SocketAddr};
 use tokio::net::TcpListener;
 use tokio_modbus::server::tcp::{accept_tcp_connection, Server};
-mod data_fetcher;
-mod home_assistant;
-mod rolling_average;
-mod shelly_3em_client;
+
+mod mqtt_fetcher;
 mod smart_meter_emulator;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
 
-    let socket_addr = env::var("FRONIUS_MODBUS_BIND")
-        .unwrap_or("0.0.0.0:502".to_string())
-        .parse()
-        .unwrap();
+    // 1. Modbus Server configuration
+    let bind_str = env::var("FRONIUS_MODBUS_BIND").unwrap_or_else(|_| "0.0.0.0:1502".to_string());
+    let socket_addr: SocketAddr = bind_str.parse().expect("Invalid FRONIUS_MODBUS_BIND address");
+
     let slave_id: u16 = env::var("FRONIUS_MODBUS_SLAVE_ID")
-        .unwrap_or_else(|_| "126".to_string())
-        .parse()
-        .expect("Invalid SLAVE_ID");
-    println!("Starting Fronius modbus bridge on: {socket_addr} - Slave-ID: {slave_id}");
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(240);
 
+    println!("Starting Fronius Modbus bridge on: {socket_addr} (Slave ID: {slave_id})");
+
+    // 2. Initialize Emulator and get Channel Transmitter handle
     let (emulated_meter, meter_update_handle) = SmartMeterEmulator::new(slave_id);
-    let _data_fetcher = DataFetcher::new(meter_update_handle);
 
-    //Start fake meter
+    // 3. MQTT Fetcher configuration
+    let broker_host = env::var("MQTT_BROKER_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+    let broker_port: u16 = env::var("MQTT_BROKER_PORT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1883);
+    let topic = env::var("MQTT_TOPIC").unwrap_or_else(|_| "meter/#".to_string());
+    let mqtt_user = env::var("MQTT_USER").ok();
+    let mqtt_password = env::var("MQTT_PASSWORD").ok();
+
+    println!("Connecting to MQTT Broker at {broker_host}:{broker_port} (Topic: {topic})");
+
+    // 4. Start MQTT Background Ingestion Task
+    mqtt_fetcher::MqttFetcher::spawn(
+        &broker_host,
+        broker_port,
+        &topic,
+        mqtt_user,
+        mqtt_password,
+        meter_update_handle.clone(),
+    )
+    .await?;
+
+    // 5. Start Modbus TCP Server
     server_context(socket_addr, emulated_meter)
         .await
-        .expect("Should never exit fake meter");
+        .expect("Modbus server encountered a fatal error");
 
     Ok(())
 }
@@ -38,16 +59,17 @@ async fn server_context(
     socket_addr: SocketAddr,
     emulated_meter: SmartMeterEmulator,
 ) -> anyhow::Result<()> {
-    println!("Starting up server on {socket_addr}");
     let listener = TcpListener::bind(socket_addr).await?;
     let server = Server::new(listener);
+
     let new_service = |_socket_addr| Ok(Some(emulated_meter.clone()));
     let on_connected = |stream, socket_addr| async move {
         accept_tcp_connection(stream, socket_addr, new_service)
     };
     let on_process_error = |err| {
-        eprintln!("{err}");
+        eprintln!("Modbus process error: {err}");
     };
+
     server.serve(&on_connected, on_process_error).await?;
     Ok(())
 }

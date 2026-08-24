@@ -2,16 +2,20 @@ services:
   fronius-meter-emulation:
     restart: always
     network_mode: host
-    image: ghcr.io/ralim/fronius_meter_emulation:latest
+    image: ghcr.io/soylentorange/fronius_meter_emulation:latest
     environment:
-      # - HA_URL=http://192.168.0.2:8123
-      # - HA_TOKEN=your_long_lived_access_token
-      # - HA_EXTRA_IMPORT=sensor.fronius_solar_extra_import
-      # - HA_EXTRA_EXPORT=sensor.fronius_solar_extra_export
-      - SHELLY_MODBUS=192.168.0.3:502
-      - SHELLY_MODBUS_SLAVE_ID=1    # matches: bvweerd/shelly_em3pro_emulator
-      - FRONIUS_MODBUS_BIND=0.0.0.0:1502  # 502 or 1502 for Fronius Symo Gen24 (502 is problematic though, probably need to run as root)
-      - FRONIUS_MODBUS_SLAVE_ID=126 # set to 1 to 14 or 84 to 127 for Fronius Symo Gen24
+      # Modbus Server Settings
+      # Set port to 502 or 1502 for Fronius Symo Gen24 (502 is problematic though, probably need to run as root)
+      - FRONIUS_MODBUS_BIND=0.0.0.0:1502
+      # set slave-id to 1 to 14 or 84 to 127 for Fronius Symo Gen24
+      - FRONIUS_MODBUS_SLAVE_ID=126
+
+      # MQTT Broker Settings
+      - MQTT_BROKER_HOST=192.168.178.244
+      - MQTT_BROKER_PORT=1883
+      - MQTT_TOPIC=meter/#
+      - MQTT_USER=your_mqtt_username
+      - MQTT_PASSWORD=your_mqtt_password
 
     healthcheck:
       test: netstat -an | grep 1502 > /dev/null; if [ 0 != $? ]; then exit 1; fi;
