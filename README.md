@@ -1,19 +1,24 @@
-# Fronius SunSpec Smart Meter Emulation (MQTT / OpenDTU)
+# Fronius & EVCC SunSpec Smart Meter Emulation (MQTT / OpenDTU)
 
-This service bridges MQTT power metrics (specifically tailored for **OpenDTU / Hoymiles microinverters** or generic MQTT power meters) to a **SunSpec-compliant Modbus TCP Smart Meter**. 
+This service bridges MQTT power metrics (specifically tailored for **OpenDTU / Hoymiles microinverters** or generic MQTT power meters) to **SunSpec-compliant Modbus TCP Smart Meters**.
 
-It enables Fronius inverters (such as the Symo, Primo, and Gen24 series) to read external AC generation data as an **auxiliary generator meter (*Erzeugerzähler*)** or sub-meter and integrate it seamlessly into the Fronius Energy Flow and Solar.web.
+It supports **two concurrent emulated meters** with independent Slave IDs and sign conventions:
+1. **Fronius Meter (Inverted Power):** Reports negative active power values (`-W`) as required by Fronius inverters (e.g. Symo, Primo, Gen24) for auxiliary generator meters (*Erzeugerzähler* / *Weiterer Erzeuger*) so external generation is integrated properly into Solar.web and Energy Flow.
+2. **EVCC Meter (Plain Power):** Reports plain positive active power values (`+W`) as expected by **EVCC** and generic PV meter integrations.
 
 ---
 
 ## Features
 
+* **Dual Emulated Meters:** Serves two Modbus Unit IDs simultaneously on the same Modbus TCP port (or optional separate ports):
+  * **Meter 1 (Fronius):** Inverted active power signs for Fronius generator meter convention.
+  * **Meter 2 (EVCC):** Plain / non-inverted active power signs for EVCC.
 * **SunSpec Compliant:** Implements **Model 1** (Common Device Identification with custom Serial Number) and **Model 213** (3-Phase AC Float Meter layout starting at register `40000`).
 * **Native OpenDTU / Hoymiles Ingestion:** Automatically consumes OpenDTU MQTT topics (`voltage`, `current`, `power`, `frequency`, `powerfactor`, `reactivepower`, `yieldtotal`) for Channel 0 (AC).
 * **Automatic Unit & Sign Conversions:**
-  * Inverts active power signs to match the Fronius Modbus convention for generator meters (negative register value = positive PV generation in Solar.web).
-  * Automatically handles unit scaling (e.g., converts kWh to Wh and normalizes power factor percentages).
-* **Watchdog Protection:** Terminates cleanly if no MQTT updates arrive within 30 seconds to prevent serving stale data to the inverter.
+  * Handles unit scaling (converts kWh to Wh, normalizes power factor percentages).
+  * Independent power sign configuration per meter.
+* **Watchdog Protection:** Terminates cleanly if no MQTT updates arrive within 30 seconds to prevent serving stale data.
 * **Lightweight & Async:** Built with Rust, `tokio`, `tokio-modbus`, and `rumqttc`.
 
 ---
@@ -21,20 +26,26 @@ It enables Fronius inverters (such as the Symo, Primo, and Gen24 series) to read
 ## Architecture & Data Flow
 
 ```text
-[OpenDTU / Inverter]
-        │
-        │ (MQTT publish: power, voltage, current, yield)
-        ▼
-  [MQTT Broker]
-        │
-        │ (rumqttc client)
-        ▼
-[Fronius Meter Emulation]
-  ├── MQTT Fetcher Task ──(mpsc channel)──► Register Handler
-  └── Modbus TCP Server (Port 1502 / 502) ◄── Holding Registers (SunSpec M1 + M213)
-        ▲
-        │ (Modbus TCP polling every 1-2s)
-[Fronius Symo / Gen24 Inverter]
+       [OpenDTU / Microinverter]
+                   │
+                   │ (MQTT publish: power, voltage, current, yield)
+                   ▼
+             [MQTT Broker]
+                   │
+                   │ (rumqttc client)
+                   ▼
+     [Fronius / EVCC Meter Emulation]
+                   │
+         ┌─────────┴─────────┐
+         ▼                   ▼
+  [Meter 1 (Fronius)]  [Meter 2 (EVCC)]
+   Slave ID: 240/126    Slave ID: 241/1
+   Inverted Power (-W)  Plain Power (+W)
+         │                   │
+         │ (Modbus TCP)      │ (Modbus TCP)
+         ▼                   ▼
+  [Fronius Inverter]      [EVCC]
+ (Symo / Gen24 Meter)  (evcc.yaml meter)
 ```
 
 ---
@@ -45,9 +56,15 @@ All configuration is provided through environment variables.
 
 | Variable | Default | Description |
 | :--- | :--- | :--- |
-| `FRONIUS_MODBUS_BIND` | `0.0.0.0:1502` | Socket address for the Modbus TCP server. |
-| `FRONIUS_MODBUS_SLAVE_ID` | `240` | Modbus Unit ID / Slave ID (must match inverter config). |
-| `INVERTER_SERIAL` | `00000001` | Serial number of the Hoymiles/OpenDTU inverter (used for topic filtering and SunSpec Model 1 SN). |
+| `FRONIUS_MODBUS_BIND` | `0.0.0.0:1502` | Socket address for the primary Modbus TCP server (serves both meters). |
+| `FRONIUS_MODBUS_SLAVE_ID` | `240` | Modbus Unit ID for Meter 1 (Fronius). Must match Fronius inverter config. |
+| `FRONIUS_INVERT_POWER` | `true` | Invert active power signs for Meter 1 (negative = PV generation in Fronius). |
+| `FRONIUS_METER_SERIAL` | `INVERTER_SERIAL` or `00000001` | Serial number for Meter 1 SunSpec Model 1 identification. |
+| `EVCC_MODBUS_SLAVE_ID` | `241` | Modbus Unit ID for Meter 2 (EVCC). Set in `evcc.yaml`. |
+| `EVCC_INVERT_POWER` | `false` | Invert active power signs for Meter 2 (`false` = plain positive power for EVCC). |
+| `EVCC_METER_SERIAL` | `INVERTER_SERIAL_evcc` or `00000002` | Serial number for Meter 2 SunSpec Model 1 identification. |
+| `EVCC_MODBUS_BIND` | *(None)* | Optional dedicated socket address for Meter 2 (if separate port is desired). |
+| `INVERTER_SERIAL` | `00000001` | Base serial number of the inverter (used for topic filtering and fallback serial). |
 | `MQTT_BROKER_HOST` | `127.0.0.1` | IP address or hostname of the MQTT broker. |
 | `MQTT_BROKER_PORT` | `1883` | Port of the MQTT broker. |
 | `MQTT_TOPIC` | `opendtu/#` | Base MQTT topic to subscribe to (use `#` wildcard). |
@@ -65,12 +82,19 @@ services:
     network_mode: host
     image: ghcr.io/soylentorange/fronius_meter_emulation:latest
     environment:
-      # Modbus settings
-      # Set port to 502 or 1502 for Fronius Symo Gen24
-      # (502 is problematic though, probably need to run as root)
+      # Modbus Server Settings
       - FRONIUS_MODBUS_BIND=0.0.0.0:1502
-      # set slave-id to 1 to 14 or 84 to 127 for Fronius Symo Gen24
+
+      # Meter 1: Fronius Inverter (Inverted power for Erzeugerzähler)
+      # For Gen24, choose a slave ID in range 1-14 or 84-127 (e.g. 126)
       - FRONIUS_MODBUS_SLAVE_ID=126
+      - FRONIUS_INVERT_POWER=true
+
+      # Meter 2: EVCC (Plain power values)
+      - EVCC_MODBUS_SLAVE_ID=241
+      - EVCC_INVERT_POWER=false
+
+      # Inverter & Serial Numbers
       - INVERTER_SERIAL=119182145457
 
       # MQTT Broker settings
@@ -103,8 +127,49 @@ services:
 
 ---
 
+## EVCC Setup (`evcc.yaml`)
+
+Add the emulated meter as a PV meter or custom meter in your `evcc.yaml`:
+
+```yaml
+meters:
+  - name: opendtu_pv
+    type: template
+    template: sunspec-inverter # or custom modbus meter
+    host: 192.168.178.xxx # IP of your Docker host
+    port: 1502
+    id: 241 # matches EVCC_MODBUS_SLAVE_ID
+```
+
+Or using custom Modbus TCP configuration:
+
+```yaml
+meters:
+  - name: opendtu_pv
+    type: custom
+    power:
+      source: modbus
+      uri: 192.168.178.xxx:1502
+      id: 241
+      register:
+        address: 40097
+        type: holding
+        decode: float32
+    energy:
+      source: modbus
+      uri: 192.168.178.xxx:1502
+      id: 241
+      register:
+        address: 40129
+        type: holding
+        decode: float32
+```
+
+---
+
 ## Kudos & References
 
 * [Photovoltaikforum: Gen24 Smart Meter Modbus TCP Emulation mit ESP32](https://www.photovoltaikforum.com/thread/224214-gen24-smart-meter-modbus-tcp-emulation-mit-esp32/)
 * [OpenDTU Project](https://github.com/tbnobody/OpenDTU)
+* [EVCC Project](https://evcc.io)
 * [Ralim/fronius_meter_emulation for the initial idea](https://github.com/Ralim/fronius_meter_emulation)

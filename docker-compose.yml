@@ -5,10 +5,19 @@ services:
     image: ghcr.io/soylentorange/fronius_meter_emulation:latest
     environment:
       # Modbus Server Settings
-      # Set port to 502 or 1502 for Fronius Symo Gen24 (502 is problematic though, probably need to run as root)
+      # Port 1502 (or 502) serves both meters concurrently
       - FRONIUS_MODBUS_BIND=0.0.0.0:1502
-      # set slave-id to 1 to 14 or 84 to 127 for Fronius Symo Gen24
+
+      # Meter 1: Fronius Inverter (Inverted power for Erzeugerzähler)
+      # For Gen24, choose a slave ID in range 1-14 or 84-127 (e.g. 126 or 240)
       - FRONIUS_MODBUS_SLAVE_ID=126
+      - FRONIUS_INVERT_POWER=true
+
+      # Meter 2: EVCC (Plain power values)
+      - EVCC_MODBUS_SLAVE_ID=241
+      - EVCC_INVERT_POWER=false
+
+      # Inverter / Serial Number
       - INVERTER_SERIAL=123456789
 
       # MQTT Broker Settings
@@ -24,3 +33,4 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+
