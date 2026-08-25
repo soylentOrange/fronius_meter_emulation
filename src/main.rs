@@ -65,14 +65,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Meter 2 (EVCC - plain values for standard EVCC meter)
     let meter2_slave_id = parse_u8_env(&["EVCC_MODBUS_SLAVE_ID", "METER2_MODBUS_SLAVE_ID"], 241);
     let meter2_invert = parse_bool_env(&["EVCC_INVERT_POWER", "METER2_INVERT_POWER"], false);
-    let meter2_serial =
-        parse_string_env(&["EVCC_METER_SERIAL", "METER2_SERIAL"]).unwrap_or_else(|| {
-            if let Some(ref sn) = inverter_serial {
-                format!("{sn}_evcc")
-            } else {
-                "00000002".to_string()
-            }
-        });
+    let meter2_serial = parse_string_env(&["EVCC_METER_SERIAL", "METER2_SERIAL"])
+        .or_else(|| inverter_serial.clone())
+        .unwrap_or_else(|| "00000002".to_string());
 
     let meter_configs = vec![
         MeterConfig {

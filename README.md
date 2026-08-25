@@ -62,7 +62,7 @@ All configuration is provided through environment variables.
 | `FRONIUS_METER_SERIAL` | `INVERTER_SERIAL` or `00000001` | Serial number for Meter 1 SunSpec Model 1 identification. |
 | `EVCC_MODBUS_SLAVE_ID` | `241` | Modbus Unit ID for Meter 2 (EVCC). Set in `evcc.yaml`. |
 | `EVCC_INVERT_POWER` | `false` | Invert active power signs for Meter 2 (`false` = plain positive power for EVCC). |
-| `EVCC_METER_SERIAL` | `INVERTER_SERIAL_evcc` or `00000002` | Serial number for Meter 2 SunSpec Model 1 identification. |
+| `EVCC_METER_SERIAL` | `INVERTER_SERIAL` or `00000002` | Serial number for Meter 2 SunSpec Model 1 identification. |
 | `EVCC_MODBUS_BIND` | *(None)* | Optional dedicated socket address for Meter 2 (if separate port is desired). |
 | `INVERTER_SERIAL` | `00000001` | Base serial number of the inverter (used for topic filtering and fallback serial). |
 | `MQTT_BROKER_HOST` | `127.0.0.1` | IP address or hostname of the MQTT broker. |

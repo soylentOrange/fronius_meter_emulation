@@ -9,7 +9,7 @@ services:
       - FRONIUS_MODBUS_BIND=0.0.0.0:1502
 
       # Meter 1: Fronius Inverter (Inverted power for Erzeugerzähler)
-      # For Gen24, choose a slave ID in range 1-14 or 84-127 (e.g. 126 or 240)
+      # For Gen24, choose a slave ID in range 1-14 or 84-127 (e.g. 126)
       - FRONIUS_MODBUS_SLAVE_ID=126
       - FRONIUS_INVERT_POWER=true
 
