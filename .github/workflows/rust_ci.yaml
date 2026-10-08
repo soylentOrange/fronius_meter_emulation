@@ -12,4 +12,16 @@ jobs:
       - name: Run cargo fmt
         run: cargo fmt --check
       - name: Run cargo clippy
-        run: cargo clippy -- -D warnings
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Run cargo test
+        run: cargo test --verbose
+
+  mqtt-restart:
+    # End-to-end: the bridge has to survive a restart of the MQTT broker (e.g. Home Assistant)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build release binary
+        run: cargo build --release
+      - name: Broker restart test
+        run: python3 tests/mqtt_restart_test.py

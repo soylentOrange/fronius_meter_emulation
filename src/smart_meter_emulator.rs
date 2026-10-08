@@ -1,4 +1,4 @@
-use std::{collections::HashMap, future, pin::Pin, process, sync::Arc};
+use std::{collections::HashMap, future, pin::Pin, sync::Arc, time::Duration};
 use tokio::{
     sync::mpsc::{self, Receiver, Sender},
     time::timeout,
@@ -240,6 +240,17 @@ impl MeterInstance {
         }
     }
 
+    /// Sets all live values (currents, powers) to zero, keeping identification, voltage,
+    /// frequency and the energy counters. Used when no readings arrive any more, so a
+    /// stale power value is never reported as if it were current.
+    pub async fn clear_live_values(&self) {
+        let mut regs = self.holding_registers.lock().await;
+        // 40071..40077 currents, 40097..40119 real/apparent/reactive power (Model 213)
+        for base in (40071..=40077).step_by(2).chain((40097..=40119).step_by(2)) {
+            set_holding_reg_f32(&mut regs, base, 0.0);
+        }
+    }
+
     pub async fn read_registers(
         &self,
         addr: u16,
@@ -250,8 +261,18 @@ impl MeterInstance {
     }
 }
 
+/// Default time without readings after which live values are reported as zero.
+pub const DEFAULT_STALE_TIMEOUT: Duration = Duration::from_secs(60);
+
 impl SmartMeterEmulator {
     pub fn new(configs: Vec<MeterConfig>) -> (Self, Sender<Readings>) {
+        Self::with_stale_timeout(configs, DEFAULT_STALE_TIMEOUT)
+    }
+
+    pub fn with_stale_timeout(
+        configs: Vec<MeterConfig>,
+        stale_timeout: Duration,
+    ) -> (Self, Sender<Readings>) {
         assert!(
             !configs.is_empty(),
             "At least one meter configuration required"
@@ -265,7 +286,7 @@ impl SmartMeterEmulator {
         let update_meters = meters.clone();
 
         tokio::spawn(async move {
-            Self::handle_incoming_register_events(rx, update_meters).await;
+            Self::handle_incoming_register_events(rx, update_meters, stale_timeout).await;
         });
 
         (
@@ -291,23 +312,56 @@ impl SmartMeterEmulator {
         }])
     }
 
+    /// Applies incoming readings to all meters.
+    ///
+    /// When no reading arrives for `stale_timeout` (MQTT broker restarting, inverters
+    /// asleep at night, ...), the live values are set to zero but the Modbus server keeps
+    /// running, so the inverter and evcc never lose the meter. As soon as readings arrive
+    /// again they are applied as usual.
     async fn handle_incoming_register_events(
         mut events: Receiver<Readings>,
         meters: Arc<Vec<MeterInstance>>,
+        stale_timeout: Duration,
     ) {
         println!(
             "Started Modbus register update handler for {} meter(s)",
             meters.len()
         );
-        let data_update_timeout = tokio::time::Duration::from_secs(30);
+        let mut stale = false;
 
-        while let Ok(Some(reading)) = timeout(data_update_timeout, events.recv()).await {
-            for meter in meters.iter() {
-                meter.update_reading(reading).await;
+        loop {
+            match timeout(stale_timeout, events.recv()).await {
+                Ok(Some(reading)) => {
+                    if stale {
+                        println!("Readings received again, reporting live values");
+                        stale = false;
+                    }
+                    for meter in meters.iter() {
+                        meter.update_reading(reading).await;
+                    }
+                }
+                Ok(None) => {
+                    // all senders dropped: nothing will ever update the meters again
+                    eprintln!("Readings channel closed, stopping register updates");
+                    for meter in meters.iter() {
+                        meter.clear_live_values().await;
+                    }
+                    return;
+                }
+                Err(_) => {
+                    if !stale {
+                        eprintln!(
+                            "No readings for {}s, reporting 0 W until data arrives again",
+                            stale_timeout.as_secs()
+                        );
+                        for meter in meters.iter() {
+                            meter.clear_live_values().await;
+                        }
+                        stale = true;
+                    }
+                }
             }
         }
-        eprintln!("No readings updates received in 30s, exiting");
-        process::exit(1);
     }
 }
 
@@ -597,6 +651,41 @@ mod tests {
         };
         let err_invalid = emulator.call(req_invalid_addr).await.unwrap_err();
         assert_eq!(err_invalid, tokio_modbus::ExceptionCode::IllegalDataAddress);
+    }
+
+    #[tokio::test]
+    async fn test_stale_readings_reset_power_but_keep_serving() {
+        let configs = vec![MeterConfig {
+            slave_id: 241,
+            serial_number: "EVCC01".to_string(),
+            invert_power: false,
+            name: "EVCC".to_string(),
+        }];
+        let (emulator, tx) =
+            SmartMeterEmulator::with_stale_timeout(configs, Duration::from_millis(100));
+        let meter = emulator.meters[0].clone();
+
+        tx.send(Readings::TotalRealPower(800.0)).await.unwrap();
+        tx.send(Readings::PhaseAVoltage(231.0)).await.unwrap();
+        tx.send(Readings::TotalExportEnergy(12000.0)).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(30)).await;
+        let p = meter.read_registers(40097, 2).await.unwrap();
+        assert_eq!(decode_f32(p[0], p[1]), 800.0);
+
+        // no readings for longer than the timeout: power drops to 0, rest is kept
+        tokio::time::sleep(Duration::from_millis(250)).await;
+        let p = meter.read_registers(40097, 2).await.unwrap();
+        assert_eq!(decode_f32(p[0], p[1]), 0.0);
+        let v = meter.read_registers(40081, 2).await.unwrap();
+        assert_eq!(decode_f32(v[0], v[1]), 231.0);
+        let e = meter.read_registers(40129, 2).await.unwrap();
+        assert_eq!(decode_f32(e[0], e[1]), 12000.0);
+
+        // readings resume: live values are applied again
+        tx.send(Readings::TotalRealPower(450.0)).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(30)).await;
+        let p = meter.read_registers(40097, 2).await.unwrap();
+        assert_eq!(decode_f32(p[0], p[1]), 450.0);
     }
 
     #[tokio::test]
