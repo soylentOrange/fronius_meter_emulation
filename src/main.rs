@@ -1,5 +1,5 @@
 use smart_meter_emulator::{MeterConfig, SmartMeterEmulator};
-use std::{env, net::SocketAddr};
+use std::{env, net::SocketAddr, time::Duration};
 use tokio::net::TcpListener;
 use tokio_modbus::server::tcp::{accept_tcp_connection, Server};
 
@@ -92,7 +92,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    let (emulated_meter, meter_update_handle) = SmartMeterEmulator::new(meter_configs);
+    // Seconds without MQTT readings after which live values are reported as 0 W
+    let stale_timeout = env::var("STALE_TIMEOUT_S")
+        .ok()
+        .and_then(|v| v.trim().parse::<u64>().ok())
+        .filter(|s| *s > 0)
+        .map(Duration::from_secs)
+        .unwrap_or(smart_meter_emulator::DEFAULT_STALE_TIMEOUT);
+    println!(
+        "  -> Live values reset to 0 after {}s without readings",
+        stale_timeout.as_secs()
+    );
+
+    let (emulated_meter, meter_update_handle) =
+        SmartMeterEmulator::with_stale_timeout(meter_configs, stale_timeout);
 
     // Optional dedicated secondary listener if configured
     let meter2_bind = env::var("EVCC_MODBUS_BIND")
@@ -116,12 +129,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|v| v.parse().ok())
         .unwrap_or(1883);
     let topic = env::var("MQTT_TOPIC").unwrap_or_else(|_| "opendtu/#".to_string());
+    let mqtt_client_id =
+        env::var("MQTT_CLIENT_ID").unwrap_or_else(|_| "fronius_bridge_client".to_string());
     let mqtt_user = env::var("MQTT_USER").ok();
     let mqtt_password = env::var("MQTT_PASSWORD").ok();
 
     mqtt_fetcher::MqttFetcher::spawn(
         &broker_host,
         broker_port,
+        &mqtt_client_id,
         &topic,
         inverter_serial,
         mqtt_user,

@@ -18,7 +18,8 @@ It supports **two concurrent emulated meters** with independent Slave IDs and si
 * **Automatic Unit & Sign Conversions:**
   * Handles unit scaling (converts kWh to Wh, normalizes power factor percentages).
   * Independent power sign configuration per meter.
-* **Watchdog Protection:** Terminates cleanly if no MQTT updates arrive within 30 seconds to prevent serving stale data.
+* **Resilient MQTT Connection:** Reconnects automatically with exponential backoff (up to 30 s) and re-subscribes after every reconnect, so a restart of the broker (e.g. Home Assistant / Mosquitto add-on) does not need a container restart.
+* **Stale Data Protection:** If no MQTT updates arrive for `STALE_TIMEOUT_S` seconds (default 60), live values (power, current) are reported as 0 while voltage, frequency and energy counters are kept. The Modbus server keeps running, so the inverter and EVCC never lose the meter; values resume as soon as data arrives again.
 * **Lightweight & Async:** Built with Rust, `tokio`, `tokio-modbus`, and `rumqttc`.
 
 ---
@@ -70,6 +71,8 @@ All configuration is provided through environment variables.
 | `MQTT_TOPIC` | `opendtu/#` | Base MQTT topic to subscribe to (use `#` wildcard). |
 | `MQTT_USER` | *(None)* | Optional username for MQTT authentication. |
 | `MQTT_PASSWORD` | *(None)* | Optional password for MQTT authentication. |
+| `MQTT_CLIENT_ID` | `fronius_bridge_client` | MQTT client ID (must be unique per broker). |
+| `STALE_TIMEOUT_S` | `60` | Seconds without readings after which power and current are reported as 0. |
 
 ---
 
@@ -103,6 +106,7 @@ services:
       - MQTT_TOPIC=opendtu/#
       - MQTT_USER=your_user_name_for_emulator
       - MQTT_PASSWORD=your_secure_password
+      - STALE_TIMEOUT_S=60
     healthcheck:
       test: ["CMD-SHELL", "netstat -an | grep 1502 > /dev/null || exit 1"]
       interval: 15s

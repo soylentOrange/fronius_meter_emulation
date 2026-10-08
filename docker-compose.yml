@@ -27,6 +27,10 @@ services:
       - MQTT_USER=your_mqtt_username
       - MQTT_PASSWORD=your_mqtt_password
 
+      # Seconds without readings after which power/current are reported as 0
+      # (process keeps running, e.g. while Home Assistant restarts)
+      - STALE_TIMEOUT_S=60
+
     healthcheck:
       test: netstat -an | grep 1502 > /dev/null; if [ 0 != $? ]; then exit 1; fi;
       interval: 10s
